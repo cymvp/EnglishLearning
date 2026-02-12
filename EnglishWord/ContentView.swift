@@ -1,66 +1,27 @@
-//
-//  ContentView.swift
-//  EnglishWord
-//
-//  Created by Yang Cui on 2026/2/11.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        TabView {
+            Tab("单词本", systemImage: "book.fill") {
+                WordListView()
             }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
+            Tab("测评", systemImage: "checkmark.circle.fill") {
+                ExamHomeView()
             }
-        } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            Tab("查词", systemImage: "magnifyingglass") {
+                DictionarySearchView()
+            }
+            Tab("聊天", systemImage: "bubble.left.and.bubble.right.fill") {
+                FreeChatView()
+            }
+            Tab("统计", systemImage: "chart.bar.fill") {
+                StatisticsHomeView()
+            }
+            Tab("设置", systemImage: "gearshape.fill") {
+                SettingsView()
             }
         }
+        .tabViewStyle(.sidebarAdaptable)
     }
-}
-
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }

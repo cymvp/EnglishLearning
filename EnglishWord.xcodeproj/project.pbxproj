@@ -398,6 +398,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机来拍照识别单词";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "需要使用麦克风来听你朗读单词 ";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册来选择包含单词的图片 ";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "需要语音识别来判断你的发音是否正确";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -442,6 +447,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机来拍照识别单词";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "需要使用麦克风来听你朗读单词 ";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册来选择包含单词的图片 ";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "需要语音识别来判断你的发音是否正确";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

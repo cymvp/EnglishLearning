@@ -1,0 +1,102 @@
+[
+  {
+    "spelling": "apple",
+    "phonetic": "/ˈæpl/",
+    "chineseMeaning": "苹果",
+    "sentences": [
+      {"english": "I eat an apple every day.", "chinese": "我每天吃一个苹果。"},
+      {"english": "The apple is red and sweet.", "chinese": "这个苹果又红又甜。"},
+      {"english": "She gave me a big apple.", "chinese": "她给了我一个大苹果。"}
+    ]
+  },
+  {
+    "spelling": "banana",
+    "phonetic": "/bəˈnænə/",
+    "chineseMeaning": "香蕉",
+    "sentences": [
+      {"english": "I like to eat bananas.", "chinese": "我喜欢吃香蕉。"},
+      {"english": "The banana is yellow.", "chinese": "香蕉是黄色的。"},
+      {"english": "Mom bought some bananas.", "chinese": "妈妈买了一些香蕉。"}
+    ]
+  },
+  {
+    "spelling": "beautiful",
+    "phonetic": "/ˈbjuːtɪfl/",
+    "chineseMeaning": "美丽的",
+    "sentences": [
+      {"english": "The flower is very beautiful.", "chinese": "这朵花非常美丽。"},
+      {"english": "She has a beautiful smile.", "chinese": "她有一个美丽的微笑。"},
+      {"english": "What a beautiful day!", "chinese": "多么美丽的一天！"}
+    ]
+  },
+  {
+    "spelling": "breakfast",
+    "phonetic": "/ˈbrekfəst/",
+    "chineseMeaning": "早餐",
+    "sentences": [
+      {"english": "I have breakfast at seven.", "chinese": "我七点吃早餐。"},
+      {"english": "What did you eat for breakfast?", "chinese": "你早餐吃了什么？"},
+      {"english": "Breakfast is ready!", "chinese": "早餐准备好了！"}
+    ]
+  },
+  {
+    "spelling": "children",
+    "phonetic": "/ˈtʃɪldrən/",
+    "chineseMeaning": "孩子们",
+    "sentences": [
+      {"english": "The children are playing outside.", "chinese": "孩子们在外面玩。"},
+      {"english": "There are many children in the park.", "chinese": "公园里有很多孩子。"},
+      {"english": "The children love ice cream.", "chinese": "孩子们喜欢冰淇淋。"}
+    ]
+  },
+  {
+    "spelling": "different",
+    "phonetic": "/ˈdɪfrənt/",
+    "chineseMeaning": "不同的",
+    "sentences": [
+      {"english": "We have different hobbies.", "chinese": "我们有不同的爱好。"},
+      {"english": "These two books are different.", "chinese": "这两本书是不同的。"},
+      {"english": "Everyone is different.", "chinese": "每个人都是不同的。"}
+    ]
+  },
+  {
+    "spelling": "elephant",
+    "phonetic": "/ˈelɪfənt/",
+    "chineseMeaning": "大象",
+    "sentences": [
+      {"english": "The elephant is very big.", "chinese": "大象非常大。"},
+      {"english": "I saw an elephant at the zoo.", "chinese": "我在动物园看到了一头大象。"},
+      {"english": "Elephants have long noses.", "chinese": "大象有长鼻子。"}
+    ]
+  },
+  {
+    "spelling": "favourite",
+    "phonetic": "/ˈfeɪvərɪt/",
+    "chineseMeaning": "最喜欢的",
+    "sentences": [
+      {"english": "What is your favourite colour?", "chinese": "你最喜欢的颜色是什么？"},
+      {"english": "Pizza is my favourite food.", "chinese": "比萨是我最喜欢的食物。"},
+      {"english": "This is my favourite song.", "chinese": "这是我最喜欢的歌。"}
+    ]
+  },
+  {
+    "spelling": "holiday",
+    "phonetic": "/ˈhɒlədeɪ/",
+    "chineseMeaning": "假日；假期",
+    "sentences": [
+      {"english": "We had a great holiday.", "chinese": "我们度过了一个美好的假期。"},
+      {"english": "Where did you go on holiday?", "chinese": "你假期去了哪里？"},
+      {"english": "The summer holiday is coming.", "chinese": "暑假快到了。"}
+    ]
+  },
+  {
+    "spelling": "important",
+    "phonetic": "/ɪmˈpɔːtənt/",
+    "chineseMeaning": "重要的",
+    "sentences": [
+      {"english": "It is important to study hard.", "chinese": "努力学习很重要。"},
+      {"english": "Health is very important.", "chinese": "健康非常重要。"},
+      {"english": "This is an important day.", "chinese": "这是重要的一天。"}
+    ]
+  }
+]
