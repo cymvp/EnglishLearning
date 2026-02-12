@@ -41,6 +41,16 @@ final class OpenAIRealtimeService: NSObject {
     private var pendingAudioData = Data()
     private var currentResponseId: String?
 
+    /// Thread-safe flag: mute mic input while AI is speaking to prevent echo self-interruption
+    private nonisolated(unsafe) var muteInput = false
+
+    /// Server has finished sending audio, waiting for local playback to complete
+    private var serverDoneSending = false
+    /// Number of audio buffers scheduled but not yet played back
+    private var pendingBufferCount = 0
+    /// Incremented on each new response or interruption; stale buffer callbacks are ignored
+    private var playbackGeneration = 0
+
     // MARK: - Connect
 
     func connect(systemPrompt: String) {
@@ -71,6 +81,7 @@ final class OpenAIRealtimeService: NSObject {
         errorMessage = ""
         currentTranscript = ""
         userTranscript = ""
+        muteInput = false
 
         // Send session config
         sendSessionUpdate(systemPrompt: systemPrompt)
@@ -90,9 +101,26 @@ final class OpenAIRealtimeService: NSObject {
         urlSession = nil
         isConnected = false
         isAISpeaking = false
+        muteInput = false
         currentTranscript = ""
         userTranscript = ""
         currentResponseId = nil
+    }
+
+    /// Manually interrupt AI speech: stop playback, cancel response, unmute mic
+    func interrupt() {
+        guard isAISpeaking else { return }
+        cancelCurrentResponse()
+        playbackGeneration += 1  // Invalidate all pending buffer callbacks
+        if isPlayerSetup {
+            playerNode.stop()
+            playerNode.play()
+        }
+        isAISpeaking = false
+        muteInput = false
+        serverDoneSending = false
+        pendingBufferCount = 0
+        currentTranscript = ""
     }
 
     // MARK: - Session Configuration
@@ -111,9 +139,9 @@ final class OpenAIRealtimeService: NSObject {
                 ],
                 "turn_detection": [
                     "type": "server_vad",
-                    "threshold": 0.5,
-                    "prefix_padding_ms": 300,
-                    "silence_duration_ms": 500
+                    "threshold": 0.875,
+                    "prefix_padding_ms": 500,
+                    "silence_duration_ms": 1200
                 ],
                 "instructions": systemPrompt
             ] as [String: Any]
@@ -151,6 +179,9 @@ final class OpenAIRealtimeService: NSObject {
         let capturedSampleRate = sampleRate
 
         inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] buffer, _ in
+            // Skip sending mic audio while AI is speaking to prevent echo self-interruption
+            guard self?.muteInput != true else { return }
+
             // All audio processing happens on the audio thread — no MainActor needed
             let ratio = capturedSampleRate / buffer.format.sampleRate
             let outputFrameCount = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
@@ -228,20 +259,39 @@ final class OpenAIRealtimeService: NSObject {
         guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: playbackFormat, frameCapacity: frameCount) else { return }
         pcmBuffer.frameLength = frameCount
 
-        // Convert PCM16 to Float32
+        // Convert PCM16 to Float32 with volume boost
+        let gain: Float = 2.5
         guard let floatData = pcmBuffer.floatChannelData?[0] else { return }
         data.withUnsafeBytes { rawBuffer in
             guard let int16Ptr = rawBuffer.bindMemory(to: Int16.self).baseAddress else { return }
             for i in 0..<Int(frameCount) {
-                floatData[i] = Float(int16Ptr[i]) / 32768.0
+                let sample = Float(int16Ptr[i]) / 32768.0 * gain
+                floatData[i] = min(max(sample, -1.0), 1.0) // clamp to avoid clipping
             }
         }
 
-        playerNode.scheduleBuffer(pcmBuffer)
-        isAISpeaking = true
+        pendingBufferCount += 1
+        let gen = playbackGeneration
+        playerNode.scheduleBuffer(pcmBuffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, gen == self.playbackGeneration else { return }
+                self.pendingBufferCount -= 1
+                if self.serverDoneSending && self.pendingBufferCount <= 0 {
+                    // All audio has been played back — AI truly finished speaking
+                    self.isAISpeaking = false
+                    self.muteInput = false
+                    self.serverDoneSending = false
+                }
+            }
+        }
+        if !isAISpeaking {
+            isAISpeaking = true
+            muteInput = true
+        }
     }
 
     private func stopPlayback() {
+        playbackGeneration += 1
         if isPlayerSetup {
             playerNode.stop()
             playerEngine.stop()
@@ -249,6 +299,9 @@ final class OpenAIRealtimeService: NSObject {
             isPlayerSetup = false
         }
         isAISpeaking = false
+        muteInput = false
+        serverDoneSending = false
+        pendingBufferCount = 0
     }
 
     // MARK: - WebSocket Send
@@ -318,7 +371,10 @@ final class OpenAIRealtimeService: NSObject {
             // AI text transcript (real-time)
             if let delta = json["delta"] as? String {
                 currentTranscript += delta
-                isAISpeaking = true
+                if !isAISpeaking {
+                    isAISpeaking = true
+                    muteInput = true
+                }
             }
 
         case "response.audio_transcript.done":
@@ -326,27 +382,47 @@ final class OpenAIRealtimeService: NSObject {
             break
 
         case "response.done":
-            // AI finished responding
+            // Server finished sending — but local playback may still be ongoing
             let transcript = currentTranscript
-            isAISpeaking = false
             if !transcript.isEmpty {
                 onAIResponseComplete?(transcript)
             }
             currentTranscript = ""
             currentResponseId = nil
 
+            if pendingBufferCount <= 0 {
+                // All audio already played back
+                isAISpeaking = false
+                muteInput = false
+            } else {
+                // Wait for buffer completion callbacks to flip isAISpeaking
+                serverDoneSending = true
+            }
+
         case "conversation.item.input_audio_transcription.completed":
             // User speech transcription done
-            if let transcript = json["transcript"] as? String, !transcript.isEmpty {
-                userTranscript = transcript
-                onUserSpeechDetected?(transcript)
+            if let transcript = json["transcript"] as? String {
+                let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    userTranscript = trimmed
+                    onUserSpeechDetected?(trimmed)
+                }
             }
 
         case "input_audio_buffer.speech_started":
-            // User started speaking — interrupt AI if it's talking
+            // With muteInput, this should only fire for real user speech (not echo)
             if isAISpeaking {
                 cancelCurrentResponse()
-                stopPlaybackForInterruption()
+                playbackGeneration += 1
+                if isPlayerSetup {
+                    playerNode.stop()
+                    playerNode.play()
+                }
+                isAISpeaking = false
+                muteInput = false
+                serverDoneSending = false
+                pendingBufferCount = 0
+                currentTranscript = ""
             }
 
         case "input_audio_buffer.speech_stopped":
@@ -355,6 +431,8 @@ final class OpenAIRealtimeService: NSObject {
         case "error":
             if let errorData = json["error"] as? [String: Any],
                let message = errorData["message"] as? String {
+                // Ignore harmless "no active response" error from cancel race condition
+                if message.contains("no active response") { break }
                 errorMessage = "Realtime 错误: \(message)"
             }
 
@@ -365,14 +443,5 @@ final class OpenAIRealtimeService: NSObject {
 
     private func cancelCurrentResponse() {
         sendJSON(["type": "response.cancel"])
-    }
-
-    private func stopPlaybackForInterruption() {
-        if isPlayerSetup {
-            playerNode.stop()
-            playerNode.play() // restart for next response
-        }
-        isAISpeaking = false
-        currentTranscript = ""
     }
 }

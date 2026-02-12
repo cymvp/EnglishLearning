@@ -240,7 +240,7 @@ struct FreeChatView: View {
                     Image(systemName: "speaker.wave.3.fill")
                         .foregroundStyle(.purple)
                         .symbolEffect(.variableColor.iterative, isActive: true)
-                    Text("AI 正在说话...")
+                    Text("AI 正在说话，点击打断...")
                         .foregroundStyle(.purple)
                 } else {
                     Image(systemName: "mic.fill")
@@ -296,6 +296,27 @@ struct FreeChatView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.purple)
+                } else if realtimeService.isAISpeaking {
+                    Button {
+                        realtimeService.interrupt()
+                    } label: {
+                        Label("打断", systemImage: "hand.raised.fill")
+                            .font(.title3)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+
+                    Button {
+                        stopConversation()
+                    } label: {
+                        Label("结束", systemImage: "stop.circle.fill")
+                            .font(.title3)
+                            .padding()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
                 } else {
                     Button {
                         stopConversation()

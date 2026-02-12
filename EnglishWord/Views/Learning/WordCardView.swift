@@ -6,6 +6,7 @@ struct WordCardView: View {
     @Query(sort: \Word.spelling) private var allWords: [Word]
     @State private var currentIndex: Int = 0
     @State private var showReadAlong = false
+    @State private var showSentencePractice = false
     @State private var isLoadingSentences = false
 
     // Learning state for current word
@@ -91,6 +92,12 @@ struct WordCardView: View {
                         checkAndMarkMastered()
                     }
                 })
+                .interactiveDismissDisabled()
+            }
+        }
+        .sheet(isPresented: $showSentencePractice) {
+            if let word = currentWord {
+                SentencePracticeView(word: word)
             }
         }
     }
@@ -277,6 +284,20 @@ struct WordCardView: View {
             .buttonStyle(.borderedProminent)
             .tint(spellingPassed ? .green : .orange)
             .disabled(isTestingSpelling)
+
+            // 造句 button
+            Button {
+                showSentencePractice = true
+            } label: {
+                HStack {
+                    Label("造句", systemImage: "text.bubble.fill")
+                        .font(.title3)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
 
             // 聊天 button (toggle voice chat)
             Button {
