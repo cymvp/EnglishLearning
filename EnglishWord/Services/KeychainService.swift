@@ -2,13 +2,16 @@ import Foundation
 import Security
 
 enum KeychainService {
-    static func save(apiKey: String) -> Bool {
+
+    // MARK: - Multi-provider API
+
+    static func save(apiKey: String, for provider: AIProvider) -> Bool {
         guard let data = apiKey.data(using: .utf8) else { return false }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.keychainServiceName,
-            kSecAttrAccount as String: Constants.keychainAccountName
+            kSecAttrAccount as String: keychainAccount(for: provider)
         ]
 
         SecItemDelete(query as CFDictionary)
@@ -20,11 +23,11 @@ enum KeychainService {
         return status == errSecSuccess
     }
 
-    static func getAPIKey() -> String? {
+    static func getAPIKey(for provider: AIProvider) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.keychainServiceName,
-            kSecAttrAccount as String: Constants.keychainAccountName,
+            kSecAttrAccount as String: keychainAccount(for: provider),
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -38,13 +41,36 @@ enum KeychainService {
         return String(data: data, encoding: .utf8)
     }
 
-    static func deleteAPIKey() -> Bool {
+    static func deleteAPIKey(for provider: AIProvider) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.keychainServiceName,
-            kSecAttrAccount as String: Constants.keychainAccountName
+            kSecAttrAccount as String: keychainAccount(for: provider)
         ]
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    // MARK: - Legacy (backward compatible, delegates to .claude)
+
+    static func save(apiKey: String) -> Bool {
+        save(apiKey: apiKey, for: .claude)
+    }
+
+    static func getAPIKey() -> String? {
+        getAPIKey(for: .claude)
+    }
+
+    static func deleteAPIKey() -> Bool {
+        deleteAPIKey(for: .claude)
+    }
+
+    // MARK: - Private
+
+    private static func keychainAccount(for provider: AIProvider) -> String {
+        switch provider {
+        case .claude: return Constants.keychainAccountName
+        case .openai: return Constants.keychainOpenAIAccountName
+        }
     }
 }

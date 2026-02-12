@@ -427,8 +427,8 @@ struct WordCardView: View {
         chatFeedback = ""
 
         guard let word = currentWord else { return }
-        guard let apiKey = KeychainService.getAPIKey() else {
-            chatFeedback = "请先配置 API Key"
+        guard let service = AIServiceFactory.learningService() else {
+            chatFeedback = AIServiceFactory.apiKeyMissingMessage(for: AppSettings.learningProvider)
             return
         }
 
@@ -442,7 +442,6 @@ struct WordCardView: View {
 
         Task {
             do {
-                let service = ClaudeAPIService(apiKey: apiKey)
                 let reply = try await service.chat(messages: chatMessages, systemPrompt: systemPrompt)
                 chatMessages.append(ChatMessage(role: "assistant", content: reply))
                 tts.speak(reply, rate: 0.45) {}
@@ -511,13 +510,12 @@ struct WordCardView: View {
     private func loadSentencesIfNeeded() {
         guard let word = currentWord, word.sentences.isEmpty else { return }
         guard !isLoadingSentences else { return }  // Prevent duplicate calls
-        guard let apiKey = KeychainService.getAPIKey() else { return }
+        guard let service = AIServiceFactory.learningService() else { return }
 
         isLoadingSentences = true
         let wordId = word.persistentModelID
         Task {
             do {
-                let service = ClaudeAPIService(apiKey: apiKey)
                 let results = try await service.generateSentences(for: word.spelling, meaning: word.chineseMeaning)
                 // Double-check the word hasn't changed and sentences weren't already added
                 if let current = currentWord,

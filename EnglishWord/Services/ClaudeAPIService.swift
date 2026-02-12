@@ -45,18 +45,20 @@ struct ChatMessage: Identifiable {
     let content: String
 }
 
-final class ClaudeAPIService: Sendable {
+final class ClaudeAPIService: AIServiceProtocol, Sendable {
     private let apiKey: String
+    private let modelOverride: String?
     private let baseURL = Constants.claudeBaseURL
     private let apiVersion = Constants.claudeAPIVersion
 
-    init(apiKey: String) {
+    init(apiKey: String, model: String? = nil) {
         self.apiKey = apiKey
+        self.modelOverride = model
     }
 
     /// Get the user-selected model ID
     private var selectedModel: String {
-        AppSettings.selectedModel.rawValue
+        modelOverride ?? AppSettings.selectedModel.rawValue
     }
 
     /// Whether extended thinking is enabled

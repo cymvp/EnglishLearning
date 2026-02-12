@@ -84,8 +84,8 @@ struct AddWordView: View {
             return
         }
 
-        guard let apiKey = KeychainService.getAPIKey(), !apiKey.isEmpty else {
-            errorMessage = "请先在设置中配置 Claude API Key"
+        guard let service = AIServiceFactory.learningService() else {
+            errorMessage = AIServiceFactory.apiKeyMissingMessage(for: AppSettings.learningProvider)
             return
         }
 
@@ -94,7 +94,6 @@ struct AddWordView: View {
 
         Task {
             do {
-                let service = ClaudeAPIService(apiKey: apiKey)
                 let result = try await service.lookupWord(normalized)
 
                 let word = Word(

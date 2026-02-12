@@ -13,12 +13,23 @@ struct FreeChatView: View {
     @State private var currentUserText = ""
     @State private var errorMessage = ""
 
+    // Claude mode
     private let tts = SpeechSynthesizerService()
     private let recognizer = SpeechRecognizerService(locale: Constants.Speech.chineseLocale)
-
-    // Silence detection
     @State private var silenceTimer: Timer?
     private let silenceThreshold: TimeInterval = 2.0
+
+    // OpenAI Realtime mode
+    @State private var realtimeService = OpenAIRealtimeService()
+    @State private var realtimeTranscript = ""  // Current AI transcript being streamed
+
+    private var usesRealtime: Bool {
+        AIServiceFactory.chatUsesRealtime
+    }
+
+    private var providerLabel: String {
+        AppSettings.chatProvider == .openai ? "OpenAI Realtime" : "Claude"
+    }
 
     private var systemPrompt: String {
         var prompt = """
@@ -30,7 +41,6 @@ struct FreeChatView: View {
         If the student seems shy, ask them fun questions to keep the conversation going.
         """
 
-        // Include today's earlier conversation summary if available
         let summary = ChatHistoryService.loadTodaySummary()
         if !summary.isEmpty {
             prompt += "\n\nHere is a summary of your earlier conversation today with this student:\n\(summary)\nContinue naturally from this context."
@@ -51,13 +61,18 @@ struct FreeChatView: View {
                                     .id(msg.id)
                             }
 
-                            // Show current user speech in real-time
-                            if chatState == .listening && !recognizer.recognizedText.isEmpty {
-                                realTimeUserBubble
+                            // Real-time user speech (Claude mode)
+                            if !usesRealtime && chatState == .listening && !recognizer.recognizedText.isEmpty {
+                                realTimeUserBubble(text: recognizer.recognizedText)
                             }
 
-                            // AI thinking indicator
-                            if chatState == .processing {
+                            // Real-time AI transcript (Realtime mode)
+                            if usesRealtime && !realtimeTranscript.isEmpty {
+                                realTimeAIBubble(text: realtimeTranscript)
+                            }
+
+                            // AI thinking indicator (Claude mode)
+                            if !usesRealtime && chatState == .processing {
                                 HStack {
                                     ProgressView()
                                     Text("AI 正在思考...")
@@ -75,6 +90,9 @@ struct FreeChatView: View {
                     .onChange(of: recognizer.recognizedText) { _, _ in
                         scrollToBottom(proxy)
                     }
+                    .onChange(of: realtimeTranscript) { _, _ in
+                        scrollToBottom(proxy)
+                    }
                 }
 
                 Divider()
@@ -84,6 +102,12 @@ struct FreeChatView: View {
             }
             .navigationTitle("聊天")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("聊天 (\(providerLabel))")
+                        .font(.headline)
+                }
+            }
             .onAppear {
                 loadTodayHistory()
             }
@@ -129,7 +153,7 @@ struct FreeChatView: View {
         }
     }
 
-    private var realTimeUserBubble: some View {
+    private func realTimeUserBubble(text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Spacer(minLength: 60)
 
@@ -137,7 +161,7 @@ struct FreeChatView: View {
                 Image(systemName: "waveform")
                     .foregroundStyle(.white.opacity(0.7))
                     .symbolEffect(.variableColor.iterative, isActive: true)
-                Text(recognizer.recognizedText)
+                Text(text)
                     .font(.body)
             }
             .padding(12)
@@ -153,7 +177,34 @@ struct FreeChatView: View {
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.blue.opacity(0.15)))
         }
-        .id("realtime")
+        .id("realtime-user")
+    }
+
+    private func realTimeAIBubble(text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "sparkles")
+                .font(.title3)
+                .foregroundStyle(.purple)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.purple.opacity(0.15)))
+
+            HStack(spacing: 6) {
+                Text(text)
+                    .font(.body)
+                Image(systemName: "speaker.wave.2.fill")
+                    .foregroundStyle(.purple.opacity(0.7))
+                    .symbolEffect(.variableColor.iterative, isActive: true)
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemGray5))
+            )
+            .foregroundStyle(.primary)
+
+            Spacer(minLength: 60)
+        }
+        .id("realtime-ai")
     }
 
     // MARK: - Bottom Bar
@@ -167,7 +218,39 @@ struct FreeChatView: View {
             }
 
             // State indicator
-            HStack(spacing: 8) {
+            stateIndicator
+
+            // Main action buttons
+            actionButtons
+        }
+        .padding()
+        .background(.bar)
+    }
+
+    private var stateIndicator: some View {
+        HStack(spacing: 8) {
+            if usesRealtime {
+                // Realtime mode indicators
+                if !realtimeService.isConnected {
+                    Image(systemName: "mic.slash")
+                        .foregroundStyle(.secondary)
+                    Text("点击下方按钮开始对话")
+                        .foregroundStyle(.secondary)
+                } else if realtimeService.isAISpeaking {
+                    Image(systemName: "speaker.wave.3.fill")
+                        .foregroundStyle(.purple)
+                        .symbolEffect(.variableColor.iterative, isActive: true)
+                    Text("AI 正在说话...")
+                        .foregroundStyle(.purple)
+                } else {
+                    Image(systemName: "mic.fill")
+                        .foregroundStyle(.green)
+                        .symbolEffect(.pulse, isActive: true)
+                    Text("正在聆听... (自动检测)")
+                        .foregroundStyle(.green)
+                }
+            } else {
+                // Claude mode indicators
                 switch chatState {
                 case .idle:
                     Image(systemName: "mic.slash")
@@ -194,13 +277,42 @@ struct FreeChatView: View {
                         .foregroundStyle(.purple)
                 }
             }
-            .font(.subheadline)
+        }
+        .font(.subheadline)
+    }
 
-            // Main action buttons
-            HStack(spacing: 12) {
+    private var actionButtons: some View {
+        HStack(spacing: 12) {
+            if usesRealtime {
+                // Realtime mode buttons
+                if !realtimeService.isConnected {
+                    Button {
+                        startRealtimeConversation()
+                    } label: {
+                        Label("开始对话", systemImage: "mic.circle.fill")
+                            .font(.title3)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                } else {
+                    Button {
+                        stopConversation()
+                    } label: {
+                        Label("结束对话", systemImage: "stop.circle.fill")
+                            .font(.title3)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                }
+            } else {
+                // Claude mode buttons
                 if chatState == .idle {
                     Button {
-                        startConversation()
+                        startClaudeConversation()
                     } label: {
                         Label("开始对话", systemImage: "mic.circle.fill")
                             .font(.title3)
@@ -244,26 +356,60 @@ struct FreeChatView: View {
                 }
             }
         }
-        .padding()
-        .background(.bar)
     }
 
-    // MARK: - Conversation Control
+    // MARK: - Realtime Conversation Control
 
-    private func startConversation() {
-        guard KeychainService.getAPIKey() != nil else {
-            errorMessage = "请先在设置中配置 API Key"
+    private func startRealtimeConversation() {
+        errorMessage = ""
+
+        // Set up callbacks
+        realtimeService.onAIResponseComplete = { transcript in
+            messages.append(ChatMessage(role: "assistant", content: transcript))
+            realtimeTranscript = ""
+        }
+
+        realtimeService.onUserSpeechDetected = { transcript in
+            messages.append(ChatMessage(role: "user", content: transcript))
+        }
+
+        // Observe realtime transcript changes
+        realtimeTranscript = ""
+
+        realtimeService.connect(systemPrompt: systemPrompt)
+
+        // Track transcript via polling (since @Observable properties update)
+        startTranscriptPolling()
+    }
+
+    @State private var transcriptTimer: Timer?
+
+    private func startTranscriptPolling() {
+        transcriptTimer?.invalidate()
+        transcriptTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            Task { @MainActor in
+                realtimeTranscript = realtimeService.currentTranscript
+                if !realtimeService.errorMessage.isEmpty && errorMessage != realtimeService.errorMessage {
+                    errorMessage = realtimeService.errorMessage
+                }
+            }
+        }
+    }
+
+    // MARK: - Claude Conversation Control
+
+    private func startClaudeConversation() {
+        guard KeychainService.getAPIKey(for: .claude) != nil else {
+            errorMessage = "请先在设置中配置 Claude API Key"
             return
         }
 
         errorMessage = ""
 
-        // Set up silence detection callback
         recognizer.onTextChanged = { [self] in
             resetSilenceTimer()
         }
 
-        // If we have history from earlier today, don't re-greet
         if messages.isEmpty {
             chatState = .aiSpeaking
             let greeting = "Hi there! I'm happy to chat with you. What would you like to talk about?"
@@ -281,21 +427,27 @@ struct FreeChatView: View {
     }
 
     private func stopConversation() {
-        silenceTimer?.invalidate()
-        silenceTimer = nil
-        recognizer.onTextChanged = nil
-        recognizer.stopRecording()
-        tts.stop()
+        if usesRealtime {
+            transcriptTimer?.invalidate()
+            transcriptTimer = nil
+            realtimeService.disconnect()
+            realtimeTranscript = ""
+        } else {
+            silenceTimer?.invalidate()
+            silenceTimer = nil
+            recognizer.onTextChanged = nil
+            recognizer.stopRecording()
+            tts.stop()
+            chatState = .idle
+        }
 
         // Save today's chat history
         if !messages.isEmpty {
             ChatHistoryService.saveTodayMessages(messages)
         }
-
-        chatState = .idle
     }
 
-    // MARK: - Listening
+    // MARK: - Listening (Claude mode)
 
     private func startListening() {
         guard chatState != .idle else { return }
@@ -311,15 +463,13 @@ struct FreeChatView: View {
         }
     }
 
-    // MARK: - Interruption (manual button)
-
     private func handleInterruption() {
         guard chatState == .aiSpeaking else { return }
         tts.stop()
         startListening()
     }
 
-    // MARK: - Silence Detection
+    // MARK: - Silence Detection (Claude mode)
 
     private func resetSilenceTimer() {
         silenceTimer?.invalidate()
@@ -354,23 +504,22 @@ struct FreeChatView: View {
         messages.append(ChatMessage(role: "user", content: userText))
         currentUserText = ""
 
-        sendToAI()
+        sendToClaudeAI()
     }
 
-    // MARK: - AI Communication
+    // MARK: - AI Communication (Claude mode)
 
-    private func sendToAI() {
+    private func sendToClaudeAI() {
         chatState = .processing
 
-        guard let apiKey = KeychainService.getAPIKey() else {
-            errorMessage = "请先配置 API Key"
+        guard let service = AIServiceFactory.chatService() else {
+            errorMessage = AIServiceFactory.apiKeyMissingMessage(for: AppSettings.chatProvider)
             chatState = .idle
             return
         }
 
         Task {
             do {
-                let service = ClaudeAPIService(apiKey: apiKey)
                 let reply = try await service.chat(messages: messages, systemPrompt: systemPrompt)
 
                 await MainActor.run {

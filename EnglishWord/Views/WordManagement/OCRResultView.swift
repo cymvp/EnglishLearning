@@ -141,14 +141,13 @@ struct OCRResultView: View {
         isLoading = true
         errorMessage = nil
 
-        guard let apiKey = KeychainService.getAPIKey(), !apiKey.isEmpty else {
-            errorMessage = "请先在设置中配置 Claude API Key"
+        guard let service = AIServiceFactory.learningService() else {
+            errorMessage = AIServiceFactory.apiKeyMissingMessage(for: AppSettings.learningProvider)
             isLoading = false
             return
         }
 
         do {
-            let service = ClaudeAPIService(apiKey: apiKey)
             recognizedWords = try await service.recognizeWords(from: image)
             isLoading = false
         } catch {

@@ -43,13 +43,12 @@ final class ChatViewModel {
         isLoading = true
         streamingText = ""
 
-        guard let apiKey = KeychainService.getAPIKey() else {
-            messages.append(ChatMessage(role: "assistant", content: "请先在设置中配置 API Key"))
+        guard let service = AIServiceFactory.learningService() else {
+            messages.append(ChatMessage(role: "assistant", content: AIServiceFactory.apiKeyMissingMessage(for: AppSettings.learningProvider)))
             isLoading = false
             return
         }
 
-        let service = ClaudeAPIService(apiKey: apiKey)
         // Only send user messages for API call (filter out initial greeting)
         let apiMessages = messages.filter { $0.role == "user" || ($0.role == "assistant" && messages.firstIndex(where: { $0.id == $0.id }) != nil) }
 

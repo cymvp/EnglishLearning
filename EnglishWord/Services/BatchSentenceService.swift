@@ -18,7 +18,7 @@ final class BatchSentenceService {
         modelContext: ModelContext,
         maxConcurrency: Int = 5
     ) async {
-        guard let apiKey = KeychainService.getAPIKey(), !apiKey.isEmpty else { return }
+        guard let service = AIServiceFactory.learningService() else { return }
 
         isProcessing = true
         totalCount = words.count
@@ -32,7 +32,6 @@ final class BatchSentenceService {
             for _ in 0..<maxConcurrency {
                 guard let word = wordIterator.next() else { break }
                 group.addTask {
-                    let service = ClaudeAPIService(apiKey: apiKey)
                     do {
                         let results = try await service.generateSentences(
                             for: word.spelling, meaning: word.meaning
@@ -63,7 +62,6 @@ final class BatchSentenceService {
 
                 if let nextWord = wordIterator.next() {
                     group.addTask {
-                        let service = ClaudeAPIService(apiKey: apiKey)
                         do {
                             let results = try await service.generateSentences(
                                 for: nextWord.spelling, meaning: nextWord.meaning

@@ -194,8 +194,8 @@ struct DictionarySearchView: View {
         let word = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         guard !word.isEmpty else { return }
 
-        guard let apiKey = KeychainService.getAPIKey() else {
-            errorMessage = "请先在设置中配置 Claude API Key"
+        guard let service = AIServiceFactory.learningService() else {
+            errorMessage = AIServiceFactory.apiKeyMissingMessage(for: AppSettings.learningProvider)
             return
         }
 
@@ -208,7 +208,6 @@ struct DictionarySearchView: View {
 
         Task {
             do {
-                let service = ClaudeAPIService(apiKey: apiKey)
                 lookupResult = try await service.lookupWord(word)
             } catch {
                 errorMessage = error.localizedDescription
@@ -263,8 +262,8 @@ struct DictionarySearchView: View {
         chatMessages.append(ChatMessage(role: "user", content: userText))
         chatFeedback = ""
 
-        guard let apiKey = KeychainService.getAPIKey() else {
-            chatFeedback = "请先配置 API Key"
+        guard let service = AIServiceFactory.learningService() else {
+            chatFeedback = AIServiceFactory.apiKeyMissingMessage(for: AppSettings.learningProvider)
             return
         }
 
@@ -278,7 +277,6 @@ struct DictionarySearchView: View {
 
         Task {
             do {
-                let service = ClaudeAPIService(apiKey: apiKey)
                 let reply = try await service.chat(messages: chatMessages, systemPrompt: systemPrompt)
                 chatMessages.append(ChatMessage(role: "assistant", content: reply))
                 tts.speak(reply, rate: 0.45) {}
